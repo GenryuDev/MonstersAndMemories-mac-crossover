@@ -485,11 +485,17 @@ cmd_play() {
     #   DXVK_STATE_CACHE_PATH — stable per-user path so the compiled shader
     #                    cache survives bottle rebuilds / nukes. Next run
     #                    of any zone you've already visited is much faster.
+    # Build DXVK environment variables
     local dxvk_cache="${HOME}/Library/Caches/mnm-dxvk"
     mkdir -p "$dxvk_cache"
-    # cxstart's --env takes one whitespace-separated NAME=VALUE list, not
-    # repeated --env flags.
-    local envlist="DXVK_ASYNC=1 DXVK_HUD=fps,gpuload,frametime DXVK_STATE_CACHE_PATH=${dxvk_cache}"
+
+    local envlist="DXVK_ASYNC=1 DXVK_STATE_CACHE_PATH=${dxvk_cache}"
+
+    # Toggle DXVK_HUD with MNM_HUD=1
+    if [[ "${MNM_HUD:-0}" == "1" ]]; then
+        envlist="${envlist} DXVK_HUD=fps,gpuload,frametime"
+        info "DXVK HUD enabled (MNM_HUD=1)"
+    fi
     "${bin}/cxstart" \
         --bottle "$BOTTLE_NAME" \
         --workdir "$gp" \
@@ -654,6 +660,7 @@ ${C_BOLD}Workflow${C_RESET}
 ${C_BOLD}Env overrides${C_RESET}
   MNM_GAMES_BASE   Base directory for game (default: $HOME/games/mnm)
                    Game will be installed directly inside this folder.
+  MNM_HUD          Show DXVK HUD (1 = enabled)     (default: off)
   MNM_DL_DIR     download cache                 (default: ./dl)
   MNM_APP_DIR    where to install the .app      (default: /Applications)
   MNM_BOTTLE     CrossOver bottle name          (default: mnm)
