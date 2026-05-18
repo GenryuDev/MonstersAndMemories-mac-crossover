@@ -1,36 +1,32 @@
 #!/usr/bin/env bash
 #
-# mnmv2.sh — Monsters & Memories on macOS, the hybrid way.
+# mnmv2.sh — Monsters & Memories on macOS (Customized)
 #
 #   Mac native launcher patches the game  ->  CrossOver runs mnm.exe
 #
-# The Windows launcher crashes under Wine (ole32 page fault at a fixed offset
-# on CrossOver 26 / wine-11.0), so we don't use it. The Mac-native Tauri app
-# handles downloads and token storage; CrossOver only runs the game client.
+# Default layout:
+#   Game files     : $HOME/games/mnm/
+#   Launcher .app  : $HOME/games/mnm_patcher_app.app
+#   Download cache : $HOME/games/dl/
 #
-# Subcommands:
-#   doctor      Check env, installs, token, game files
-#   mac         Download + xattr fix + re-sign + install Mac launcher
-#   bottle      Create the CrossOver bottle tuned for the game (DXVK)
-#   patch       Open the Mac launcher with --stinky-cheese (skips update loop)
-#   play        Read token from launcher.db, run mnm.exe in the bottle
-#   all         doctor + mac + bottle   (you still run patch, then play)
-#   clean       Remove cached downloads (keeps bottle + installed app)
-#   nuke-bottle Destroy the CrossOver bottle (interactive confirm)
+# This version prefers launching the Mac launcher from the parent of the
+# game directory to avoid creating a nested "mnm/mnm/" structure.
 #
-# See LEARNINGS.md for the full investigation.
+# The Windows launcher crashes under Wine, so we only use the Mac launcher
+# for patching/auth and CrossOver for the game client only.
+#
+# See LEARNINGS.md for technical background.
 
 set -euo pipefail
 
 # ---- configuration ----------------------------------------------------------
-# Two sources for the Mac launcher tar.gz:
-#   1. The launcher-update API — always current, URL is versioned.
-#      We ask for the user's exact arch so we don't ship the wrong build.
-#   2. The public download page — frozen at an older version (was 0.20.3 when
-#      we last looked, while the API was handing out 0.22.13).
-# "mac" prefers (1), falls back to (2) if the API is unreachable.
-# Default layout focused on: $HOME/games/mnm
-# Override with MNM_GAMES_BASE if you want a different base directory.
+# Default focused layout (customized in mnmv2.sh):
+#   GAMES_BASE     = $HOME/games/mnm          → where game files live
+#   APP_INSTALL_DIR = $HOME/games             → where launcher .app is installed
+#   DL_DIR         = $HOME/games/dl           → launcher tarball cache
+#
+# We launch the Mac launcher from the *parent* of GAMES_BASE when possible
+# to reduce the chance of the launcher creating an extra nested folder.
 GAMES_BASE="${MNM_GAMES_BASE:-${HOME}/games/mnm}"
 
 # Launcher update sources
@@ -96,7 +92,11 @@ db_get() {
 }
 
 game_dir() {
-    # 1. Explicit env override
+    # Resolution order (customized for mnmv2.sh):
+    #   1. MNM_GAMEDIR env override (highest priority)
+    #   2. gamePath stored in launcher.db
+    #   3. Auto-discover starting with GAMES_BASE (~/games/mnm)
+    #   4. Fall back to GAMES_BASE
     if [[ -n "${MNM_GAMEDIR:-}" ]]; then
         echo "$MNM_GAMEDIR"
         return
@@ -263,13 +263,14 @@ cmd_doctor() {
         user="$(db_get username)"
         tok="$(db_get token)"
         gp="$(game_dir)"
+
         if [[ -n "$tok" ]]; then
             [[ -n "$user" ]] && ok "Logged in as ${user}" || ok "Logged in"
             local status; status="$(token_status)"
             case "$status" in
                 valid*)    ok "Token — ${status}" ;;
                 expiring*) warn "Token ${status} — re-login soon (./mnmv2.sh patch)" ;;
-                expired*)  warn "Token ${status} — re-login (./mnmv2.sh patch) before ./mnmv2.sh play" ;;
+                expired*)  warn "Token ${status} — re-login (./mnmv2.sh patch) before play" ;;
                 *)         ok "Token present (${#tok} chars)" ;;
             esac
         elif [[ -n "$user" ]]; then
@@ -277,10 +278,15 @@ cmd_doctor() {
         else
             warn "Not logged in — run ./mnmv2.sh patch"
         fi
-        echo "  gamePath     : ${gp}"
+
+        echo "  Expected game dir : ${GAMES_BASE}"
+        echo "  Current gamePath  : ${gp}"
         exe="${gp}/${GAME_EXE_NAME}"
-        if [[ -f "$exe" ]]; then ok "Game exe found: ${exe}"
-        else warn "No ${GAME_EXE_NAME} in gamePath — run: ./mnmv2.sh patch  (then click Install)"; fi
+        if [[ -f "$exe" ]]; then
+            ok "Game exe found: ${exe}"
+        else
+            warn "No ${GAME_EXE_NAME} found yet — run ./mnmv2.sh patch then Install in launcher"
+        fi
     else
         warn "launcher.db missing — open the launcher once (./mnmv2.sh patch)"
     fi
@@ -372,18 +378,21 @@ cmd_patch() {
     local target_dir
     target_dir="$(game_dir)"
 
-    info "Launching Mac launcher from: ${target_dir}"
-    info "(Launching from this directory helps the launcher default to your preferred game path)"
+    info "Launching Mac launcher from parent of game directory..."
+    info "Target game path: ${target_dir}"
 
     mkdir -p "$target_dir"
 
-    # Fixed: disown is now inside the subshell so it doesn't fail
-    (cd "$target_dir" && nohup "$APP_BIN" --stinky-cheese >/dev/null 2>&1 & disown)
+    # We cd into the *parent* of the target game dir before launching.
+    # This helps prevent the launcher from creating a nested "mnm/mnm/" folder.
+    local launch_dir
+    launch_dir="$(dirname "$target_dir")"
 
-    ok "Launcher started from ${target_dir}"
+    (cd "$launch_dir" && nohup "$APP_BIN" --stinky-cheese >/dev/null 2>&1 & disown)
+
+    ok "Launcher started"
     warn "${C_BOLD}Do NOT click Play${C_RESET} inside the Mac launcher."
-    warn "If it already shows the Play button, run ${C_BOLD}./mnmv2.sh repatch${C_RESET} to force a fresh file check."
-    warn "When you're done, close the launcher and run: ${C_BOLD}./mnmv2.sh play${C_RESET}"
+    warn "When finished, close the launcher and run: ${C_BOLD}./mnmv2.sh play${C_RESET}"
 }
 
 cmd_refresh() {
@@ -495,10 +504,11 @@ cmd_all() {
     cmd_mac
     cmd_bottle
     echo
-    info "Next steps:"
-    echo "  1. ${C_BOLD}./mnmv2.sh patch${C_RESET}   (opens launcher — log in + Install/Patch)"
-    echo "  2. Close the launcher when patching finishes"
-    echo "  3. ${C_BOLD}./mnmv2.sh play${C_RESET}"
+    info "Next steps (expected layout: ~/games/mnm/):"
+    echo "  1. ${C_BOLD}./mnmv2.sh patch${C_RESET}   (opens launcher from ~/games/)"
+    echo "  2. Log in and click Install — game should install into ~/games/mnm/"
+    echo "  3. Close the launcher when finished"
+    echo "  4. ${C_BOLD}./mnmv2.sh play${C_RESET}"
 }
 
 cmd_clean() {
@@ -642,7 +652,8 @@ ${C_BOLD}Workflow${C_RESET}
   ${C_DIM}on patch day:${C_RESET}  ./mnmv2.sh patch  ${C_DIM}# update, then play again${C_RESET}
 
 ${C_BOLD}Env overrides${C_RESET}
-  MNM_GAMES_BASE   Base dir for game + launcher (default: $HOME/games/mnm)
+  MNM_GAMES_BASE   Base directory for game (default: $HOME/games/mnm)
+                   Game will be installed directly inside this folder.
   MNM_DL_DIR     download cache                 (default: ./dl)
   MNM_APP_DIR    where to install the .app      (default: /Applications)
   MNM_BOTTLE     CrossOver bottle name          (default: mnm)
