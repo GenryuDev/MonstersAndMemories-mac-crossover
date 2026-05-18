@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# mnm.sh — Monsters & Memories on macOS, the hybrid way.
+# mnmv2.sh — Monsters & Memories on macOS, the hybrid way.
 #
 #   Mac native launcher patches the game  ->  CrossOver runs mnm.exe
 #
@@ -29,10 +29,9 @@ set -euo pipefail
 #   2. The public download page — frozen at an older version (was 0.20.3 when
 #      we last looked, while the API was handing out 0.22.13).
 # "mac" prefers (1), falls back to (2) if the API is unreachable.
-# ---- configuration ----------------------------------------------------------
-# ---- configuration ----------------------------------------------------------
 # Default layout focused on: $HOME/games/mnm
 # Override with MNM_GAMES_BASE if you want a different base directory.
+# ---- configuration ----------------------------------------------------------
 GAMES_BASE="${MNM_GAMES_BASE:-${HOME}/games/mnm}"
 
 # Launcher update sources
@@ -246,18 +245,18 @@ cmd_doctor() {
             if [[ -n "$inst_sha" && -n "$latest_sha" && "$inst_sha" == "$latest_sha" ]]; then
                 ok "Mac launcher ${iver} (API advertises ${lver}, same binary)"
             elif [[ -z "$latest_sha" ]]; then
-                echo "  Mac launcher : ${iver}. API advertises ${lver} — run ./mnm.sh mac to verify"
+                echo "  Mac launcher : ${iver}. API advertises ${lver} — run ./mnmv2.sh mac to verify"
             else
-                warn "Mac launcher ${iver} installed — different binary at ${lver} (run: ./mnm.sh mac)"
+                warn "Mac launcher ${iver} installed — different binary at ${lver} (run: ./mnmv2.sh mac)"
             fi
         else
             ok "Mac launcher ${iver:-unknown} at ${APP_INSTALL_PATH}"
         fi
     else
-        echo "  Mac launcher : not installed — run: ./mnm.sh mac"
+        echo "  Mac launcher : not installed — run: ./mnmv2.sh mac"
     fi
     [[ -d "$BOTTLE_ROOT" ]] && ok "Bottle '${BOTTLE_NAME}' exists" \
-        || echo "  Bottle       : not created — run: ./mnm.sh bottle"
+        || echo "  Bottle       : not created — run: ./mnmv2.sh bottle"
 
     step "Game state (from launcher.db)"
     if [[ -f "$LAUNCHER_DB" ]]; then
@@ -270,21 +269,21 @@ cmd_doctor() {
             local status; status="$(token_status)"
             case "$status" in
                 valid*)    ok "Token — ${status}" ;;
-                expiring*) warn "Token ${status} — re-login soon (./mnm.sh patch)" ;;
-                expired*)  warn "Token ${status} — re-login (./mnm.sh patch) before ./mnm.sh play" ;;
+                expiring*) warn "Token ${status} — re-login soon (./mnmv2.sh patch)" ;;
+                expired*)  warn "Token ${status} — re-login (./mnmv2.sh patch) before ./mnmv2.sh play" ;;
                 *)         ok "Token present (${#tok} chars)" ;;
             esac
         elif [[ -n "$user" ]]; then
-            warn "Username ${user} remembered but no token — finish login in ./mnm.sh patch"
+            warn "Username ${user} remembered but no token — finish login in ./mnmv2.sh patch"
         else
-            warn "Not logged in — run ./mnm.sh patch"
+            warn "Not logged in — run ./mnmv2.sh patch"
         fi
         echo "  gamePath     : ${gp}"
         exe="${gp}/${GAME_EXE_NAME}"
         if [[ -f "$exe" ]]; then ok "Game exe found: ${exe}"
-        else warn "No ${GAME_EXE_NAME} in gamePath — run: ./mnm.sh patch  (then click Install)"; fi
+        else warn "No ${GAME_EXE_NAME} in gamePath — run: ./mnmv2.sh patch  (then click Install)"; fi
     else
-        warn "launcher.db missing — open the launcher once (./mnm.sh patch)"
+        warn "launcher.db missing — open the launcher once (./mnmv2.sh patch)"
     fi
 
     step "Downloads cached in ${DL_DIR}"
@@ -344,7 +343,7 @@ cmd_mac() {
     shasum -a 256 "$tar" | cut -d' ' -f1 > "${DL_DIR}/.installed_tar.sha256"
     ok "Installed"
     echo
-    info "Next: ${C_BOLD}./mnm.sh patch${C_RESET}  (opens the launcher with --stinky-cheese)"
+    info "Next: ${C_BOLD}./mnmv2.sh patch${C_RESET}  (opens the launcher with --stinky-cheese)"
 }
 
 cmd_bottle() {
@@ -369,7 +368,7 @@ cmd_bottle() {
 }
 
 cmd_patch() {
-    [[ -x "$APP_BIN" ]] || fail "Mac launcher not installed — run: ./mnm.sh mac"
+    [[ -x "$APP_BIN" ]] || fail "Mac launcher not installed — run: ./mnmv2.sh mac"
 
     local target_dir
     target_dir="$(game_dir)"
@@ -386,7 +385,7 @@ cmd_patch() {
     ok "Launcher started"
     warn "${C_BOLD}Do NOT click Play${C_RESET} in the launcher (it tries to run the Windows exe natively)."
     warn "Log in → set install location to: ${target_dir} → then Download/Patch."
-    warn "After patching finishes, close the launcher and run: ${C_BOLD}./mnm.sh play${C_RESET}"
+    warn "After patching finishes, close the launcher and run: ${C_BOLD}./mnmv2.sh play${C_RESET}"
 }
 
 cmd_refresh() {
@@ -400,13 +399,13 @@ cmd_refresh() {
     # advertises a version label newer than the binary it actually serves.
     # If that happens, close it, use `patch` (stinky-cheese on) for daily
     # use, and only call `refresh` occasionally.
-    [[ -x "$APP_BIN" ]] || fail "Mac launcher not installed — run: ./mnm.sh mac"
+    [[ -x "$APP_BIN" ]] || fail "Mac launcher not installed — run: ./mnmv2.sh mac"
     if pgrep -fq "mnm_launcher"; then
         warn "Launcher is still running — close it first."
         exit 1
     fi
     info "Opening launcher with update check ENABLED (no --stinky-cheese)…"
-    warn "If it loops downloading, force-quit it and use ${C_BOLD}./mnm.sh patch${C_RESET} instead."
+    warn "If it loops downloading, force-quit it and use ${C_BOLD}./mnmv2.sh patch${C_RESET} instead."
     nohup "$APP_BIN" >/dev/null 2>&1 &
     disown
     ok "Launcher started. Log in, then check the channel dropdown for a new entry."
@@ -419,7 +418,7 @@ cmd_repatch() {
     # in the launcher UI doesn't help because it short-circuits on the
     # version record. Deleting that row makes the next launch fetch the
     # manifest fresh and download only the changed chunks.
-    [[ -f "$LAUNCHER_DB" ]] || fail "No launcher.db — run: ./mnm.sh patch first"
+    [[ -f "$LAUNCHER_DB" ]] || fail "No launcher.db — run: ./mnmv2.sh patch first"
 
     if pgrep -fq "mnm_launcher"; then
         warn "Launcher is still running — close it first, then re-run this."
@@ -442,18 +441,18 @@ cmd_repatch() {
 
 cmd_play() {
     local bin; bin="$(cx_bin)" || fail "CrossOver not installed"
-    [[ -d "$BOTTLE_ROOT" ]] || fail "No bottle — run: ./mnm.sh bottle"
+    [[ -d "$BOTTLE_ROOT" ]] || fail "No bottle — run: ./mnmv2.sh bottle"
     [[ -f "$LAUNCHER_DB" ]] || fail "No launcher.db — run patch + log in first"
 
     local token gp exe
     token="$(db_get token)"
-    [[ -n "$token" ]] || fail "No token in launcher.db — open the launcher and log in (./mnm.sh patch)"
+    [[ -n "$token" ]] || fail "No token in launcher.db — open the launcher and log in (./mnmv2.sh patch)"
 
     local status; status="$(token_status)"
     case "$status" in
         expired*)
             warn "Token ${status} — the game will reject it."
-            warn "Refresh first: ${C_BOLD}./mnm.sh patch${C_RESET}  (launcher auto-refreshes on open)"
+            warn "Refresh first: ${C_BOLD}./mnmv2.sh patch${C_RESET}  (launcher auto-refreshes on open)"
             fail "Aborting before a guaranteed login failure."
             ;;
         expiring\ \<1h)
@@ -463,7 +462,7 @@ cmd_play() {
 
     gp="$(game_dir)"
     exe="${gp}/${GAME_EXE_NAME}"
-    [[ -f "$exe" ]] || fail "Game not downloaded — ${exe} missing. Run: ./mnm.sh patch  (then Install in the UI)"
+    [[ -f "$exe" ]] || fail "Game not downloaded — ${exe} missing. Run: ./mnmv2.sh patch  (then Install in the UI)"
 
     info "Launching ${GAME_EXE_NAME} in bottle '${BOTTLE_NAME}' (workdir: ${gp})…"
     # --workdir is important for Unity asset loading.
@@ -499,9 +498,9 @@ cmd_all() {
     cmd_bottle
     echo
     info "Next steps:"
-    echo "  1. ${C_BOLD}./mnm.sh patch${C_RESET}  (opens launcher, log in, Install/Patch)"
+    echo "  1. ${C_BOLD}./mnmv2.sh patch${C_RESET}  (opens launcher, log in, Install/Patch)"
     echo "  2. Close the launcher once patching finishes"
-    echo "  3. ${C_BOLD}./mnm.sh play${C_RESET}"
+    echo "  3. ${C_BOLD}./mnmv2.sh play${C_RESET}"
 }
 
 cmd_clean() {
@@ -567,7 +566,7 @@ cmd_nuke() {
     fi
 
     rm -rf "$DL_DIR" "${SCRIPT_DIR}/extracted"
-    ok "Clean slate. Next: ${C_BOLD}./mnm.sh all${C_RESET} and then ${C_BOLD}./mnm.sh patch${C_RESET}."
+    ok "Clean slate. Next: ${C_BOLD}./mnmv2.sh all${C_RESET} and then ${C_BOLD}./mnmv2.sh patch${C_RESET}."
 }
 
 cmd_nuke_bottle() {
@@ -603,10 +602,10 @@ ${C_BOLD}Commands${C_RESET}
   nuke-bottle   Destroy the CrossOver bottle only (confirms first)
 
 ${C_BOLD}Workflow${C_RESET}
-  ${C_DIM}first time:${C_RESET}    ./mnm.sh all && ./mnm.sh patch  ${C_DIM}# log in + download${C_RESET}
-                                    ./mnm.sh play   ${C_DIM}# once patching is done${C_RESET}
-  ${C_DIM}every launch:${C_RESET}  ./mnm.sh play
-  ${C_DIM}on patch day:${C_RESET}  ./mnm.sh patch  ${C_DIM}# update, then play again${C_RESET}
+  ${C_DIM}first time:${C_RESET}    ./mnmv2.sh all && ./mnmv2.sh patch  ${C_DIM}# log in + download${C_RESET}
+                                    ./mnmv2.sh play   ${C_DIM}# once patching is done${C_RESET}
+  ${C_DIM}every launch:${C_RESET}  ./mnmv2.sh play
+  ${C_DIM}on patch day:${C_RESET}  ./mnmv2.sh patch  ${C_DIM}# update, then play again${C_RESET}
 
 ${C_BOLD}Env overrides${C_RESET}
   MNM_GAMES_BASE   Base dir for game + launcher (default: $HOME/games/mnm)
