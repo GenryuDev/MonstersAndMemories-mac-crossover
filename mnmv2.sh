@@ -377,14 +377,13 @@ cmd_patch() {
 
     mkdir -p "$target_dir"
 
-    # Launch with explicit working directory so the Tauri launcher inherits a good CWD
-    (cd "$target_dir" && nohup "$APP_BIN" --stinky-cheese >/dev/null 2>&1 &)
-    disown
+    # Fixed: disown is now inside the subshell so it doesn't fail
+    (cd "$target_dir" && nohup "$APP_BIN" --stinky-cheese >/dev/null 2>&1 & disown)
 
-    ok "Launcher started"
-    warn "${C_BOLD}Do NOT click Play${C_RESET} in the launcher (it tries to run the Windows exe natively)."
-    warn "Log in → set install location to: ${target_dir} → then Download/Patch."
-    warn "After patching finishes, close the launcher and run: ${C_BOLD}./mnmv2.sh play${C_RESET}"
+    ok "Launcher started from ${target_dir}"
+    warn "${C_BOLD}Do NOT click Play${C_RESET} inside the Mac launcher."
+    warn "If it already shows the Play button, run ${C_BOLD}./mnmv2.sh repatch${C_RESET} to force a fresh file check."
+    warn "When you're done, close the launcher and run: ${C_BOLD}./mnmv2.sh play${C_RESET}"
 }
 
 cmd_refresh() {
@@ -451,11 +450,11 @@ cmd_play() {
     case "$status" in
         expired*)
             warn "Token ${status} — the game will reject it."
-            warn "Refresh first: ${C_BOLD}./mnmv2.sh patch${C_RESET}  (launcher auto-refreshes on open)"
-            fail "Aborting before a guaranteed login failure."
+            warn "Run: ${C_BOLD}./mnmv2.sh patch${C_RESET} first (launcher will refresh the token)."
+            fail "Aborting before guaranteed login failure."
             ;;
         expiring\ \<1h)
-            warn "Token ${status} — it may expire mid-session."
+            warn "Token ${status} — it may expire during your session."
             ;;
     esac
 
@@ -497,8 +496,8 @@ cmd_all() {
     cmd_bottle
     echo
     info "Next steps:"
-    echo "  1. ${C_BOLD}./mnmv2.sh patch${C_RESET}  (opens launcher, log in, Install/Patch)"
-    echo "  2. Close the launcher once patching finishes"
+    echo "  1. ${C_BOLD}./mnmv2.sh patch${C_RESET}   (opens launcher — log in + Install/Patch)"
+    echo "  2. Close the launcher when patching finishes"
     echo "  3. ${C_BOLD}./mnmv2.sh play${C_RESET}"
 }
 
