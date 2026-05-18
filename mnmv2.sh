@@ -31,7 +31,6 @@ set -euo pipefail
 # "mac" prefers (1), falls back to (2) if the API is unreachable.
 # Default layout focused on: $HOME/games/mnm
 # Override with MNM_GAMES_BASE if you want a different base directory.
-# ---- configuration ----------------------------------------------------------
 GAMES_BASE="${MNM_GAMES_BASE:-${HOME}/games/mnm}"
 
 # Launcher update sources
@@ -582,7 +581,7 @@ cmd_nuke_bottle() {
 # ---- dispatch ---------------------------------------------------------------
 usage() {
     cat <<EOF
-${C_BOLD}mnm.sh${C_RESET} — Monsters & Memories on macOS (Mac launcher + CrossOver game)
+${C_BOLD}mnmv2.sh${C_RESET} — Monsters & Memories on macOS (Mac launcher + CrossOver game)
 
 Usage: $0 <command>
 
