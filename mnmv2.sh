@@ -507,6 +507,41 @@ cmd_clean() {
     ok "Done. Bottle and installed .app not touched."
 }
 
+# reset-db — Resets the Mac launcher state (launcher.db + installed .app)
+# Use this when you want to start fresh with the launcher (e.g. wrong install path,
+# corrupted state, or after manually deleting folders). It does NOT touch your
+# CrossOver bottle or game files.
+cmd_reset_db() {
+    step "Resetting Mac launcher database and app"
+
+    local supportdir="${HOME}/Library/Application Support/com.monstersandmemories.mnm-patcher-app"
+
+    echo "This will remove:"
+    echo "  • Launcher database and settings (${supportdir})"
+    echo "  • Installed Mac launcher app     (${APP_INSTALL_PATH})"
+    echo
+    echo "It will NOT remove:"
+    echo "  • Your CrossOver bottle"
+    echo "  • Game files"
+    echo
+
+    read -r -p "Type ${C_BOLD}reset${C_RESET} to confirm: " ans
+    [[ "$ans" == "reset" ]] || fail "Cancelled."
+
+    if [[ -d "$supportdir" ]]; then
+        info "Removing launcher data: ${supportdir}"
+        rm -rf "$supportdir"
+    fi
+
+    if [[ -d "$APP_INSTALL_PATH" ]]; then
+        info "Removing Mac launcher: ${APP_INSTALL_PATH}"
+        rm -rf "$APP_INSTALL_PATH"
+    fi
+
+    ok "Launcher reset complete."
+    info "Run ${C_BOLD}./mnmv2.sh patch${C_RESET} to set up the launcher again."
+}
+
 cmd_nuke() {
     step "Full teardown"
 
@@ -596,6 +631,7 @@ ${C_BOLD}Commands${C_RESET}
   play          Read token from launcher.db, run mnm.exe in the bottle
   all           doctor + mac + bottle  (then run patch, then play)
   clean         Remove cached downloads
+  reset-db      Reset launcher.db + installed Mac launcher (keeps bottle + game files)
   nuke          Full teardown: app + launcher data + game files + bottle + dl/
   nuke-bottle   Destroy the CrossOver bottle only (confirms first)
 
@@ -624,6 +660,7 @@ case "${1:-}" in
     play)           cmd_play ;;
     all)            cmd_all ;;
     clean)          cmd_clean ;;
+    reset-db)       cmd_reset_db ;;
     nuke)           cmd_nuke ;;
     nuke-bottle)    cmd_nuke_bottle ;;
     -h|--help|help|"") usage ;;
